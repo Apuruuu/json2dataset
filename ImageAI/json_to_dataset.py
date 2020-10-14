@@ -3,76 +3,76 @@ import os
 import re
 import numpy
 import time
+from labelme import utils
 
 import cv2
 
 class CropImage():
-    def __init__(self, filename, ROI):
-        self.ROI = ROI
-        self.filename = filename
-        self.outpath = 'dataset'
+    def __init__(self, file_dir, outpath):
+        self.outpath = outpath
+        self.imgpath = file_dir
+        self.folder = []
+        for folder in os.listdir(self.outpath):
+            if os.path.isdir(os.path.join(self.outpath, folder)):
+                self.folder.append(folder)
+        self.json_reader()
 
-    def cut(self):
-        img = cv2.imread(self.filename)
-        for roi in self.ROI:
-            crop = img[roi[1]:roi[2], roi[3]:roi[4]]
-            save(roi[0], crop)
+    def cut(self, img, labels, regions):
+        for num in range(len(labels)):
+            roi = regions[num]
+            label = labels[num]
+            
+            crop = img[roi[0]:roi[1], roi[2]:roi[3]]
+            self.save(label, crop)
 
-        imwrite.release()
-        cv2.destroyAllWindows()
+    def save(self, label, crop):
+        if not label in self.folder:
+            os.mkdir(os.path.join(self.outpath, label))
+            self.folder.append(label)
 
-    def save(folder, crop):
-        path = os.path.join(self.outpath, floder, str(time()) + ".jpg")
+        img_list = numpy.hstack(numpy.hstack(crop)).tolist()
+        img_str = ''.join(str(s) for s in img_list if s not in ['NONE','NULL'])
+        path = os.path.join(self.outpath, label, str(hash(img_str)) + ".jpg")
         cv2.imwrite(path, crop)
 
-    def path_check(path):
-        for folder in paths:
-            if os.path.exists(folder):
+    def json_reader(self):
+        # load shapes
+        data = json.load(open(self.imgpath))
 
+        imageData = data.get("imageData")
 
-def json_reader(path, filename):
-    # load shapes
-    _file = json.load(open(os.path.join(path, filename)))
-    shapes = _file['shapes']
+        img = utils.img_b64_to_arr(imageData)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-    labels = []
-    regions = []
-    for shape in shapes:
-        label = re.split('\d+$', shape['label'])[0]
-        labels.append(label)
+        shapes = data['shapes']
 
-        original_region = numpy.array(shape['points'], 
-                                            dtype='int' # 取整 Rounding
-                                            )
-        original_region_max = numpy.max(original_region, axis=0)
-        original_region_min = numpy.min(original_region, axis=0)
-        xmin, ymin = original_region_min
-        xmax, ymax = original_region_max
-        regions.append([label, ymin, ymax, xmin, xmax])
+        labels = []
+        regions = []
+        for shape in shapes:
+            label = re.split('\d+$', shape['label'])[0]
+            labels.append(label)
 
+            original_region = numpy.array(shape['points'], 
+                                                dtype='int' # 取整 Rounding
+                                                )
+            original_region_max = numpy.max(original_region, axis=0)
+            original_region_min = numpy.min(original_region, axis=0)
+            xmin, ymin = original_region_min
+            xmax, ymax = original_region_max
+            regions.append([ymin, ymax, xmin, xmax])
+        self.cut(img, labels, regions)
 
-
-    return labels, regions
-
-# def path_check(path):
-#     for folder in paths:
-#         if os.path.exists(folder):
-
-#     检测path， 如果没有则添加
-
-# cutROI（图片路径，ROI）
 
 if __name__ == "__main__":
-    # workpath = "dataset"
-    # if not os.path.exists(workpath):
-    #     os.mkdir(workpath)
-    # os.chdir(workpath)
-
-
-    labels, regions = json_reader('C:\\Users\\wyf55\\Documents\\GitHub\\json2dataset', 'train90m00003.json')
-    print(labels, regions)
-    CropImage('C:\\Users\\wyf55\\Documents\\GitHub\\json2dataset\\train90m00003.jpg', labels, regions)
-
-
-
+    outpath = 'dataset'
+    imgpath = 'images'
     
+    filenames = []
+    for file in os.walk(imgpath):
+        for filename in file[2]:
+            if os.path.splitext(filename)[1] == '.json':
+                filenames.append(filename)
+
+    for filename in filenames:
+        file_dir = os.path.join(imgpath, filename)
+        CropImage(file_dir, outpath)
