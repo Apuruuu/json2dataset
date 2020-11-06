@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import re
 import numpy
 import time
@@ -17,6 +18,8 @@ class Json2dataset():
         self.get_regions(shapes)
         if saveas == 'VOC2012':
             self.voc2012format(saveimg)
+        if saveas == "CROP":
+            self.crop()
             
     def json_reader(self, jsonpath):
         # load .json file
@@ -68,13 +71,32 @@ class Json2dataset():
                 os.makedirs(jpg_outpath)
             self.img_save(path=jpg_outpath, filename=self.filename, img=self.img)
 
+    def crop(self):
+        for num in range(len(self.regions)):
+            roi = self.regions[num]
+            label = self.regions[num]['label']
+            crop = self.img[roi['ymin']:roi['ymax'], roi['xmin']:roi['xmax']]
+
+            jpg_outpath = os.path.join(self.outpath, label)
+            if not os.path.exists(jpg_outpath):
+                os.makedirs(jpg_outpath)
+            # 随机命名（时间+图片拼一起算哈希）
+            img_list = numpy.hstack(numpy.hstack(crop)).tolist()
+            img_str = str(time.time()).join(str(s) for s in img_list if s not in ['NONE','NULL'])
+            filename = str(abs(hash(img_str)))
+            self.img_save(path=jpg_outpath, filename=filename, img=crop)
+
     def img_save(self, img, filename, path):
         cv2.imwrite(os.path.join(path, filename+".jpg"), img)
 
 if __name__ == "__main__":
-    outpath = 'dataset'
-    imgpath = 'images'
-    saveas = 'VOC2012'
+    Format=['VOC2012', 'CROP']
+
+    print('format =', Format)
+    saveas = input('Which one??? >>> input:')
+
+    outpath = 'dataset_' + str(saveas) + str(int(time.time()))
+    imgpath = 'json'
 
     if not os.path.exists(outpath):
         os.makedirs(outpath)
@@ -84,6 +106,8 @@ if __name__ == "__main__":
         for filename in file[2]:
             if os.path.splitext(filename)[1] == '.json':
                 filenames.append(filename[:-5])
-
+    
     for filename in filenames:
+        starttime = time.time()
         Json2dataset(jsonpath=imgpath, filename=filename, outpath=outpath, saveas=saveas, saveimg=True)
+        print('%s  Takes %.3f seconds'%(filename, time.time()-starttime))
